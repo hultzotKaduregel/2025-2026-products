@@ -427,7 +427,7 @@ def create_product_row(product_info: Dict) -> Dict:
         if team in NATIONAL_TEAMS:
             row[f'productOptionDescription{option_num}'] = 'ללא פאץ׳;גביע העולם 2026'
         else:
-            row[f'productOptionDescription{option_num}'] = 'ללא פאץ׳;ליגה;ליגת האלופות'
+            row[f'productOptionDescription{option_num}'] = product_info.get('patch_options', 'ללא פאץ׳;ליגה;ליגת האלופות')
         option_num += 1
     
     # Complete set option (shorts/socks)
@@ -1600,7 +1600,7 @@ def insert_product_in_order(csv_file: Path, product_row: Dict, product_info: Dic
     print(f"✓ המוצר הוכנס במיקום {insert_index + 1} (עם {len(variant_rows)} variants, סה\"כ {len(rows)} שורות)")
 
 
-def interactive_add_product(csv_file: Path):
+def interactive_add_product(csv_file: Path, append_to_merchant: bool = False):
     """Interactive process to add a product"""
     
     print("\n" + "="*70)
@@ -1751,49 +1751,138 @@ def interactive_add_product(csv_file: Path):
         
         product_info['team'] = team
         memory['team'] = team
+        
+        # Ask about additional patch options (for club teams only, not national teams)
+        if category in ["חולצות גברים", "חולצות גברים ארוכות", "חליפות ילדים"] and shirt_type and team not in NATIONAL_TEAMS:
+            print("\n" + "="*70)
+            print("בחר פאצ׳ים נוספים להוסיף (מעבר ל'ללא פאץ׳' ו'ליגה'):")
+            
+            patch_extra_options = [
+                "לא להוסיף פאצ׳ים נוספים (רק ליגת האלופות)",
+                "הליגה האירופית",
+                "קונפרנס ליג",
+                "ליגת האלופות והליגה האירופית",
+                "ליגת האלופות וקונפרנס ליג"
+            ]
+            
+            default_patch_idx = 0
+            if 'patch_choice' in memory:
+                try:
+                    default_patch_idx = int(memory['patch_choice'])
+                    if default_patch_idx < 0 or default_patch_idx >= len(patch_extra_options):
+                        default_patch_idx = 0
+                except:
+                    default_patch_idx = 0
+            
+            selected_patch = select_option("בחר אופציה:", patch_extra_options, default_patch_idx)
+            
+            # Build patch options string
+            if selected_patch == patch_extra_options[0]:
+                # Default - Champions League only
+                product_info['patch_options'] = 'ללא פאץ׳;ליגה;ליגת האלופות'
+                memory['patch_choice'] = 0
+            elif selected_patch == patch_extra_options[1]:
+                # Europa League
+                product_info['patch_options'] = 'ללא פאץ׳;ליגה;הליגה האירופית'
+                memory['patch_choice'] = 1
+            elif selected_patch == patch_extra_options[2]:
+                # Conference League
+                product_info['patch_options'] = 'ללא פאץ׳;ליגה;קונפרנס ליג'
+                memory['patch_choice'] = 2
+            elif selected_patch == patch_extra_options[3]:
+                # Champions + Europa
+                product_info['patch_options'] = 'ללא פאץ׳;ליגה;ליגת האלופות;הליגה האירופית'
+                memory['patch_choice'] = 3
+            elif selected_patch == patch_extra_options[4]:
+                # Champions + Conference
+                product_info['patch_options'] = 'ללא פאץ׳;ליגה;ליגת האלופות;קונפרנס ליג'
+                memory['patch_choice'] = 4
     else:
-        # Fallback to number-based selection
-        print("\n" + "="*70)
-        print("בחר קבוצה:")
-        print("\nמועדוני כדורגל:")
-        for i, team in enumerate(CLUB_TEAMS, 1):
-            print(f"  {i}. {team}")
-        
-        offset = len(CLUB_TEAMS)
-        print("\nנבחרות לאומיות:")
-        for i, team in enumerate(NATIONAL_TEAMS, 1):
-            print(f"  {i + offset}. {team}")
-        
-        while True:
-            try:
-                choice = int(input("\nבחר מספר: "))
-                if 1 <= choice <= len(all_teams):
-                    team = all_teams[choice - 1]
-                    
-                    # If "מועדונים אחרים" or "נבחרות אחרות", ask for custom name
-                    if team == "מועדונים אחרים":
-                        custom_team = input("\nהזן שם מועדון: ").strip()
-                        if custom_team:
-                            team = custom_team
-                            print(f"✓ נבחר: {team}")
-                        else:
-                            print("❌ לא הוזן שם, נא לנסות שוב")
-                            continue
-                    elif team == "נבחרות אחרות":
-                        custom_team = input("\nהזן שם נבחרת: ").strip()
-                        if custom_team:
-                            team = custom_team
-                            print(f"✓ נבחר: {team}")
-                        else:
-                            print("❌ לא הוזן שם, נא לנסות שוב")
-                            continue
-                    
-                    product_info['team'] = team
-                    break
-                else:
-                    print(f"❌ נא לבחור מספר בין 1 ל-{len(all_teams)}")
-            except ValueError:
-                print("❌ נא להזין מספר תקין")
+            # Fallback to number-based selection
+            print("\n" + "="*70)
+            print("בחר קבוצה:")
+            print("\nמועדוני כדורגל:")
+            for i, team in enumerate(CLUB_TEAMS, 1):
+                print(f"  {i}. {team}")
+            
+            offset = len(CLUB_TEAMS)
+            print("\nנבחרות לאומיות:")
+            for i, team in enumerate(NATIONAL_TEAMS, 1):
+                print(f"  {i + offset}. {team}")
+            
+            while True:
+                try:
+                    choice = int(input("\nבחר מספר: "))
+                    if 1 <= choice <= len(all_teams):
+                        team = all_teams[choice - 1]
+                        
+                        # If "מועדונים אחרים" or "נבחרות אחרות", ask for custom name
+                        if team == "מועדונים אחרים":
+                            custom_input = input("\nהזן שם מועדון: ").strip()
+                            if custom_input:
+                                custom_team_name = custom_input
+                                product_info['custom_team_name'] = custom_team_name
+                                print(f"✓ נבחר: {custom_team_name}")
+                            else:
+                                print("❌ לא הוזן שם, נא לנסות שוב")
+                                continue
+                        elif team == "נבחרות אחרות":
+                            custom_input = input("\nהזן שם נבחרת: ").strip()
+                            if custom_input:
+                                custom_team_name = custom_input
+                                product_info['custom_team_name'] = custom_team_name
+                                print(f"✓ נבחר: {custom_team_name}")
+                            else:
+                                print("❌ לא הוזן שם, נא לנסות שוב")
+                                continue
+                        
+                        product_info['team'] = team
+                        break
+                    else:
+                        print(f"❌ נא לבחור מספר בין 1 ל-{len(all_teams)}")
+                except ValueError:
+                    print("❌ נא להזין מספר תקין")
+            
+            # Ask about additional patch options (for club teams only, not national teams)
+            if category in ["חולצות גברים", "חולצות גברים ארוכות", "חליפות ילדים"] and shirt_type and team not in NATIONAL_TEAMS:
+                print("\n" + "="*70)
+                print("בחר פאצ׳ים נוספים להוסיף (מעבר ל'ללא פאץ׳' ו'ליגה'):")
+                
+                patch_extra_options = [
+                    "לא להוסיף פאצ׳ים נוספים (רק ליגת האלופות)",
+                    "הליגה האירופית",
+                    "קונפרנס ליג",
+                    "ליגת האלופות והליגה האירופית",
+                    "ליגת האלופות וקונפרנס ליג"
+                ]
+                
+                default_patch_idx = 0
+                if 'patch_choice' in memory:
+                    try:
+                        default_patch_idx = int(memory['patch_choice'])
+                        if default_patch_idx < 0 or default_patch_idx >= len(patch_extra_options):
+                            default_patch_idx = 0
+                    except:
+                        default_patch_idx = 0
+                
+                selected_patch = select_option("בחר אופציה:", patch_extra_options, default_patch_idx)
+                
+                # Build patch options string
+                if selected_patch == patch_extra_options[0]:
+                    product_info['patch_options'] = 'ללא פאץ׳;ליגה;ליגת האלופות'
+                    memory['patch_choice'] = 0
+                elif selected_patch == patch_extra_options[1]:
+                    product_info['patch_options'] = 'ללא פאץ׳;ליגה;הליגה האירופית'
+                    memory['patch_choice'] = 1
+                elif selected_patch == patch_extra_options[2]:
+                    product_info['patch_options'] = 'ללא פאץ׳;ליגה;קונפרנס ליג'
+                    memory['patch_choice'] = 2
+                elif selected_patch == patch_extra_options[3]:
+                    product_info['patch_options'] = 'ללא פאץ׳;ליגה;ליגת האלופות;הליגה האירופית'
+                    memory['patch_choice'] = 3
+                elif selected_patch == patch_extra_options[4]:
+                    product_info['patch_options'] = 'ללא פאץ׳;ליגה;ליגת האלופות;קונפרנס ליג'
+                    memory['patch_choice'] = 4
     
     # Build product name
 # Use custom team name if it exists, otherwise use team
@@ -2005,7 +2094,20 @@ def interactive_add_product(csv_file: Path):
     # Insert product in the correct sorted position
     print("\nמכניס מוצר במיקום הנכון...")
     insert_product_in_order(csv_file, product_row, product_info, fieldnames)
-    
+
+    # Append to Google Merchant feed
+    if append_to_merchant:
+        price_category = product_info['category']
+        if product_info['category'] == "ג'קטים ומעילים":
+            age_group = product_info.get('age_group', 'מבוגרים')
+            price_category = f"{product_info['category']} ל{age_group}"
+
+        base_price = float(CATEGORY_PRICES.get(price_category, '280.0'))
+        discount = float(CATEGORY_DISCOUNTS.get(price_category, '130.1'))
+        final_price = base_price - discount
+
+        append_single_product_to_merchant_feed(csv_file, product_info['name'], product_info['images'], final_price)
+
     # Save memory for next time
     save_memory(memory)
     
@@ -2037,117 +2139,47 @@ def clean_description(description_html: str) -> str:
     clean = clean.replace('&nbsp;', ' ').strip()
     return clean
 
-
-def generate_google_merchant_feed(csv_file: Path) -> Optional[Path]:
-    """
-    Generate Google Merchant Center product feed from the CSV file.
-    Returns the path to the generated file, or None if failed.
-    """
-    try:
-        # Determine output file name
-        output_file = csv_file.parent / f"{csv_file.stem}_googlemerchant.txt"
-
-        file_exists = output_file.exists()
+def append_single_product_to_merchant_feed(csv_file: Path, product_name: str, product_images: List[str], final_price: float):
+    """Append a single product to Google Merchant feed"""
+    output_file = csv_file.parent / f"{csv_file.stem}_googlemerchant.txt"
+    
+    # Clean product name for title/description
+    title = re.sub(r'(\d{4})/(\d{4})', lambda m: f"{m.group(1)[-2:]}/{m.group(2)[-2:]}", product_name)
+    description = title
+    
+    # Generate product URL
+    product_url_slug = sanitize_url_text(product_name)
+    product_link = f"https://www.xn--6dbbfabi4agf8g0au.com/product-page/{product_url_slug}"
+    
+    # Generate unique product ID
+    product_id = generate_product_id(product_name)
+    
+    product_data = {
+        'id': product_id,
+        'title': title,
+        'description': description,
+        'link': product_link,
+        'image_link': product_images[0] if product_images else '',
+        'additional_image_link': ','.join(product_images[1:11]) if len(product_images) > 1 else '',
+        'price': f"{final_price:.2f} ILS",
+        'availability': 'in_stock',
+        'condition': 'new'
+    }
+    
+    # Check if file exists
+    file_exists = output_file.exists()
+    
+    # Append to file
+    with open(output_file, 'a', encoding='utf-8', newline='') as f:
+        fieldnames = ['id', 'title', 'description', 'link', 'image_link', 
+                     'additional_image_link', 'price', 'availability', 'condition']
+        writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter='\t', extrasaction='ignore')
         
-        products = []
+        # Write header only if file is new
+        if not file_exists:
+            writer.writeheader()
         
-        with open(csv_file, 'r', encoding='utf-8-sig') as f:
-            reader = csv.DictReader(f)
-            
-            current_product = None
-            
-            for row in reader:
-                # Check if this is a Product row (not a Variant)
-                field_type = row.get('fieldType', '').strip()
-                
-                if field_type == 'Product':
-                    # Save previous product if exists
-                    if current_product:
-                        products.append(current_product)
-                    
-                    # Start new product
-                    product_name = row.get('name', '').strip()
-                    product_name_original = product_name
-                    product_name = re.sub(r'(\d{4})/(\d{4})', lambda m: f"{m.group(1)[-2:]}/{m.group(2)[-2:]}", product_name)
-                    description_html = row.get('description', '').strip()
-                    description = clean_description(description_html)
-                    description = re.sub(r'(\d{4})/(\d{4})', lambda m: f"{m.group(1)[-2:]}/{m.group(2)[-2:]}", description)
-                    if not description:
-                        description = product_name
-                    
-                    # Get images (semicolon-separated)
-                    images = row.get('productImageUrl', '').strip()
-                    image_list = [img.strip() for img in images.split(';') if img.strip()]
-                    
-                    # First image is the main image_link
-                    image_link = image_list[0] if image_list else ''
-                    
-                    # Additional images (Google supports up to 10 additional images)
-                    additional_images = image_list[1:11] if len(image_list) > 1 else []
-                    
-                    # Get price and discount
-                    price_str = row.get('price', '').strip()
-                    discount_str = row.get('discountValue', '').strip()
-                    
-                    try:
-                        base_price = float(price_str) if price_str else 0
-                        discount = float(discount_str) if discount_str else 0
-                        final_price = base_price - discount
-                        
-                        # Ensure price is positive
-                        if final_price <= 0:
-                            final_price = base_price if base_price > 0 else 149.9
-                    except (ValueError, TypeError):
-                        final_price = 149.9
-                    
-                    # Generate product URL
-                    product_url_slug = sanitize_url_text(product_name_original)
-                    product_link = f"https://www.xn--6dbbfabi4agf8g0au.com/product-page/{product_url_slug}"
-                    
-                    # Generate unique product ID
-                    product_id = generate_product_id(product_name)
-                    
-                    current_product = {
-                        'id': product_id,
-                        'title': product_name,
-                        'description': description,
-                        'link': product_link,
-                        'image_link': image_link,
-                        'price': f"{final_price:.2f} ILS",
-                        'availability': 'in_stock',
-                        'condition': 'new'
-                    }
-                    
-                    # Add additional images if they exist
-                    if len(additional_images) > 0:
-                        current_product['additional_image_link'] = ','.join(additional_images)
-        
-        # Don't forget the last product
-        if current_product:
-            products.append(current_product)
-        
-        # Write to TSV format (tab-separated values) as required by Google Merchant
-        mode = 'a' if file_exists else 'w'
-        with open(output_file, mode, encoding='utf-8', newline='') as f:
-            if products:
-                fieldnames = ['id', 'title', 'description', 'link', 'image_link', 
-                             'additional_image_link', 'price', 'availability', 'condition']
-                writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter='\t', extrasaction='ignore')
-
-                if not file_exists:
-                    writer.writeheader()
-
-                for product in products:
-                    writer.writerow(product)
-        
-        print(f"\n✓ נוצר קובץ Google Merchant: {output_file}")
-        print(f"  מספר מוצרים: {len(products)}")
-        
-        return output_file
-        
-    except Exception as e:
-        print(f"\n⚠️  שגיאה ביצירת קובץ Google Merchant: {e}")
-        return None
+        writer.writerow(product_data)
 
 
 def main():
@@ -2266,12 +2298,8 @@ python add_product.py -h
     csv_path = Path(args.csv_file)
     
     try:
-        interactive_add_product(csv_path)
-        
-        # Generate Google Merchant feed if requested
-        if args.google_merchant and csv_path.exists():
-            generate_google_merchant_feed(csv_path)
-            
+        interactive_add_product(csv_path, append_to_merchant=args.google_merchant)
+                    
     except KeyboardInterrupt:
         print("\n\n❌ בוטל על ידי המשתמש")
         sys.exit(1)
