@@ -280,8 +280,8 @@ def build_product_name(category: str, team: str, shirt_type: Optional[str],
     # חולצות גברים
     if category == "חולצות גברים":
         base_name = f"חולצת {team} {shirt_type} {season_short}"
-        if version == "גרסת אוהד":
-            return f"{base_name} - גרסת אוהד"
+        if version == "גרסת שחקן":
+            return f"{base_name} - גרסת שחקן"
         return base_name
     
     # חולצות גברים ארוכות
@@ -2067,6 +2067,7 @@ def generate_google_merchant_feed(csv_file: Path) -> Optional[Path]:
                     
                     # Start new product
                     product_name = row.get('name', '').strip()
+                    product_name_original = product_name
                     product_name = re.sub(r'(\d{4})/(\d{4})', lambda m: f"{m.group(1)[-2:]}/{m.group(2)[-2:]}", product_name)
                     description_html = row.get('description', '').strip()
                     description = clean_description(description_html)
@@ -2100,7 +2101,7 @@ def generate_google_merchant_feed(csv_file: Path) -> Optional[Path]:
                         final_price = 149.9
                     
                     # Generate product URL
-                    product_url_slug = sanitize_url_text(product_name)
+                    product_url_slug = sanitize_url_text(product_name_original)
                     product_link = f"https://www.xn--6dbbfabi4agf8g0au.com/product-page/{product_url_slug}"
                     
                     # Generate unique product ID
