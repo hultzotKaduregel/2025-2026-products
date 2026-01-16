@@ -2173,7 +2173,7 @@ def append_single_product_to_merchant_feed(csv_file: Path, product_name: str, pr
     with open(output_file, 'a', encoding='utf-8', newline='') as f:
         fieldnames = ['id', 'title', 'description', 'link', 'image_link', 
                      'additional_image_link', 'price', 'availability', 'condition']
-        writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter='\t', extrasaction='ignore')
+        writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter='\t', extrasaction='ignore', lineterminator='\n')
         
         # Write header only if file is new
         if not file_exists:
