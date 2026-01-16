@@ -63,7 +63,7 @@ def save_memory(memory: Dict):
 GITHUB_BLOB_URL = "https://github.com/hultzotKaduregel/2025-2026-products/blob/main/images"
 
 # Season options
-SEASONS = ["2025/2026", "2026/2027", "2027/2028", "2028/2029", "2029/2030"]
+SEASONS = ["2026/2025", "2027/2026", "2028/2027", "2029/2028", "2030/2029"]
 
 # Categories
 CATEGORIES = [
@@ -79,7 +79,7 @@ CATEGORIES = [
 # Sub-categories
 VERSION_OPTIONS = ["גרסת אוהד", "גרסת שחקן"]
 JACKET_OPTIONS = ["ג'קט", "מעיל רוח"]
-SHIRT_TYPES = ["בית", "חוץ", "שלישית", "שוער"]
+SHIRT_TYPES = ["בית", "חוץ", "השלישית", "שוער"]
 
 # Teams
 CLUB_TEAMS = [
@@ -87,13 +87,13 @@ CLUB_TEAMS = [
     "ברצלונה", "ריאל מדריד", "אתלטיקו מדריד",
     "יובנטוס", "מילאן", "אינטר מילאנו", "רומא", "נאפולי",
     "באיירן מינכן", "בורוסיה דורטמונד",
-    "פריז סן-ז'רמן",
+    "פריז סן ז'רמן",
     "אייאקס",
     "מועדונים אחרים"
 ]
 
 NATIONAL_TEAMS = [
-    "אוסטרליה", "אוסטריה", "אורוגוואי", "אלגיריה", "אנגליה", "ארגנטינה", "ארה״ב",
+    "אוסטרליה", "אוסטריה", "אורוגוואי", "איטליה", "אלגיריה", "אנגליה", "ארגנטינה", "ארה\"ב",
     "בלגיה", "ברזיל", "גרמניה", "הולנד", "טוניסיה", "יפן", "ירדן", "מקסיקו",
     "מצרים", "מרוקו", "נורווגיה", "שוויץ", "סקוטלנד", "ספרד", "ערב הסעודית",
     "צרפת", "קטאר", "קנדה",
@@ -104,7 +104,7 @@ NATIONAL_TEAMS = [
 SHIRT_TYPE_EN = {
     "בית": "first",
     "חוץ": "second",
-    "שלישית": "third",
+    "השלישית": "third",
     "שוער": "goalkeeper"
 }
 
@@ -298,7 +298,8 @@ def build_product_name(category: str, team: str, shirt_type: Optional[str],
     
     # מכנסיים
     elif category == "מכנסיים":
-        return f"מכנס {team} {shirt_type} {season_short}"
+        pants_type = shirt_type.replace("השלישית", "השלישי") if shirt_type else shirt_type
+        return f"מכנס {team} {pants_type} {season_short}"
     
     # אימוניות
     elif category == "אימוניות":
@@ -417,18 +418,16 @@ def create_product_row(product_info: Dict) -> Dict:
         row[f'productOptionDescription{option_num}'] = product_info.get('sizes', default_sizes)
         option_num += 1
     
-    # Patch option (for shirts)
-    if category in ['חולצות גברים', 'חולצות גברים ארוכות']:
+    # Patch option (for shirts and kids suits)
+    if category in ['חולצות גברים', 'חולצות גברים ארוכות', 'חליפות ילדים']:
         row[f'productOptionName{option_num}'] = 'פאץ׳'
         row[f'productOptionType{option_num}'] = 'DROP_DOWN'
-        row[f'productOptionDescription{option_num}'] = 'ללא פאץ׳;ליגה;ליגת האלופות'
-        option_num += 1
-    
-    # Patch option for kids suits
-    if category == 'חליפות ילדים':
-        row[f'productOptionName{option_num}'] = 'פאץ׳'
-        row[f'productOptionType{option_num}'] = 'DROP_DOWN'
-        row[f'productOptionDescription{option_num}'] = 'ללא פאץ׳;ליגה;ליגת האלופות'
+        # Check if team is a national team
+        team = product_info['team']
+        if team in NATIONAL_TEAMS:
+            row[f'productOptionDescription{option_num}'] = 'ללא פאץ׳;גביע העולם 2026'
+        else:
+            row[f'productOptionDescription{option_num}'] = 'ללא פאץ׳;ליגה;ליגת האלופות'
         option_num += 1
     
     # Complete set option (shorts/socks)
@@ -457,12 +456,29 @@ def create_product_row(product_info: Dict) -> Dict:
     add_additional_info(row, category)
     
     # Custom text fields
-    row['customTextField1'] = ''
-    row['customTextCharLimit1'] = ''
-    row['customTextMandatory1'] = ''
-    row['customTextField2'] = ''
-    row['customTextCharLimit2'] = ''
-    row['customTextMandatory2'] = ''
+    if category in ['חולצות גברים', 'חולצות גברים ארוכות', 'חליפות ילדים', 'חולצות נשים']:
+        # For shirts - add "מספר" (number) field
+        row['customTextField1'] = 'שם מאחור באנגלית'
+        row['customTextCharLimit1'] = '20'
+        row['customTextMandatory1'] = 'false'
+        row['customTextField2'] = 'מספר מאחור'
+        row['customTextCharLimit2'] = '2'
+        row['customTextMandatory2'] = 'false'
+    elif category == 'מכנסיים':
+        # For pants - add "מספר" (number) field
+        row['customTextField1'] = 'מספר'
+        row['customTextCharLimit1'] = '2'
+        row['customTextMandatory1'] = 'false'
+        row['customTextField2'] = ''
+        row['customTextCharLimit2'] = ''
+        row['customTextMandatory2'] = ''
+    else:
+        row['customTextField1'] = ''
+        row['customTextCharLimit1'] = ''
+        row['customTextMandatory1'] = ''
+        row['customTextField2'] = ''
+        row['customTextCharLimit2'] = ''
+        row['customTextMandatory2'] = ''
     
     # Brand at the end
     row['brand'] = ''
@@ -1329,7 +1345,7 @@ for i, team in enumerate(national_sorted):
 SHIRT_TYPE_ORDER = {
     "בית": 1,
     "חוץ": 2,
-    "שלישית": 3,
+    "השלישית": 3,
     "שוער": 4,
     "שוער 1": 4,
     "שוער 2": 5
@@ -1390,7 +1406,8 @@ def check_product_exists(csv_file: Path, product_info: Dict) -> Optional[str]:
                     return product_name
             
             elif category == "מכנסיים":
-                pattern = f"מכנס {team} {sub_category} {season_short}"
+                pants_type = sub_category.replace("השלישית", "השלישי") if sub_category else sub_category
+                pattern = f"מכנס {team} {pants_type} {season_short}"
                 if pattern in product_name:
                     return product_name
             
@@ -1706,35 +1723,31 @@ def interactive_add_product(csv_file: Path):
             custom_input = input(f"\nהזן שם מועדון (Enter = '{default_custom}'): ").strip() if default_custom else input("\nהזן שם מועדון: ").strip()
             
             if not custom_input and default_custom:
-                team = default_custom
+                custom_team_name = default_custom
             elif custom_input:
-                team = custom_input
-                memory['custom_club'] = team
+                custom_team_name = custom_input
+                memory['custom_club'] = custom_input
             else:
                 print("❌ לא הוזן שם, אנא הרץ שוב")
                 return
             
-            print(f"✓ נבחר: {team}")
+            print(f"✓ נבחר: {custom_team_name}")
+            product_info['custom_team_name'] = custom_team_name
         elif team == "נבחרות אחרות":
             default_custom = memory.get('custom_national', '')
             custom_input = input(f"\nהזן שם נבחרת (Enter = '{default_custom}'): ").strip() if default_custom else input("\nהזן שם נבחרת: ").strip()
             
             if not custom_input and default_custom:
-                team = default_custom
+                custom_team_name = default_custom
             elif custom_input:
-                team = custom_input
-                memory['custom_national'] = team
+                custom_team_name = custom_input
+                memory['custom_national'] = custom_input
             else:
                 print("❌ לא הוזן שם, אנא הרץ שוב")
                 return
             
-            print(f"✓ נבחר: {team}")
-            if custom_team:
-                team = custom_team
-                print(f"✓ נבחר: {team}")
-            else:
-                print("❌ לא הוזן שם, אנא הרץ שוב")
-                return
+            print(f"✓ נבחר: {custom_team_name}")
+            product_info['custom_team_name'] = custom_team_name
         
         product_info['team'] = team
         memory['team'] = team
@@ -1783,7 +1796,9 @@ def interactive_add_product(csv_file: Path):
                 print("❌ נא להזין מספר תקין")
     
     # Build product name
-    product_name = build_product_name(category, team, shirt_type, version, jacket_type, color, season, age_group)
+# Use custom team name if it exists, otherwise use team
+    team_for_name = product_info.get('custom_team_name', team)
+    product_name = build_product_name(category, team_for_name, shirt_type, version, jacket_type, color, season, age_group)
     product_info['name'] = product_name
     print(f"\n✓ שם המוצר: {product_name}")
     
@@ -2052,8 +2067,10 @@ def generate_google_merchant_feed(csv_file: Path) -> Optional[Path]:
                     
                     # Start new product
                     product_name = row.get('name', '').strip()
+                    product_name = re.sub(r'(\d{4})/(\d{4})', lambda m: f"{m.group(1)[-2:]}/{m.group(2)[-2:]}", product_name)
                     description_html = row.get('description', '').strip()
                     description = clean_description(description_html)
+                    description = re.sub(r'(\d{4})/(\d{4})', lambda m: f"{m.group(1)[-2:]}/{m.group(2)[-2:]}", description)
                     if not description:
                         description = product_name
                     
@@ -2160,7 +2177,7 @@ def main():
    - קטגוריות אחרות: מדלג על שלב זה
 
 4. תת-קטגוריה 2 (תלוי בקטגוריה):
-   - חולצות, חליפות, מכנסיים: בחירת סוג (בית/חוץ/שלישית/שוער)
+   - חולצות, חליפות, מכנסיים: בחירת סוג (בית/חוץ/השלישית/שוער)
    - אימוניות וג'קטים: הזנת צבע ידנית
 
 5. בחירת קבוצה:
@@ -2202,7 +2219,7 @@ def main():
 המוצרים מסודרים לפי:
 1. קטגוריה (חולצות גברים → חולצות גברים ארוכות → ... → ג'קטים ומעילים)
 2. קבוצה (מועדונים לפי סדר קבוע, נבחרות לפי א"ב)
-3. תת-קטגוריה (בית → חוץ → שלישית → שוער)
+3. תת-קטגוריה (בית → חוץ → השלישית → שוער)
 4. שם המוצר (אלפביתית)
 
 דוגמאות שימוש:
