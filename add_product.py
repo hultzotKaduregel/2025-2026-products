@@ -60,7 +60,7 @@ def save_memory(memory: Dict):
 
 
 # GitHub base URL for images
-GITHUB_BLOB_URL = "https://github.com/hultzotKaduregel/2025-2026-products/blob/main/images"
+GITHUB_BLOB_URL = "https://raw.github.com/hultzotKaduregel/2025-2026-products/refs/heads/main/images"
 
 # Season options
 SEASONS = ["2026/2025", "2027/2026", "2028/2027", "2029/2028", "2030/2029"]
@@ -83,7 +83,7 @@ SHIRT_TYPES = ["בית", "חוץ", "השלישית", "שוער"]
 
 # Teams
 CLUB_TEAMS = [
-    "ליברפול", "מנצ'סטר יונייטד", "ארסנל", "מנצ'סטר סיטי", "צ'לסי", "טוטנהאם",
+    "ליברפול", "מנצ'סטר יונייטד", "מנצ'סטר סיטי", "ארסנל", "צ'לסי", "טוטנהאם",
     "ברצלונה", "ריאל מדריד", "אתלטיקו מדריד",
     "יובנטוס", "מילאן", "אינטר מילאנו", "רומא", "נאפולי",
     "באיירן מינכן", "בורוסיה דורטמונד",
@@ -95,8 +95,8 @@ CLUB_TEAMS = [
 NATIONAL_TEAMS = [
     "אוסטרליה", "אוסטריה", "אורוגוואי", "איטליה", "אלגיריה", "אנגליה", "ארגנטינה", "ארה\"ב",
     "בלגיה", "ברזיל", "גרמניה", "הולנד", "טוניסיה", "יפן", "ירדן", "מקסיקו",
-    "מצרים", "מרוקו", "נורווגיה", "שוויץ", "סקוטלנד", "ספרד", "ערב הסעודית",
-    "צרפת", "קטאר", "קנדה",
+    "מצרים", "מרוקו", "נורווגיה", "סקוטלנד", "ספרד", "ערב הסעודית", "פורטוגל",
+    "צרפת", "קטאר", "קנדה", "שוויץ",
     "נבחרות אחרות"
 ]
 
@@ -264,7 +264,7 @@ def download_images(urls: List[str], category: str, team: str, subdir: str) -> L
             # Create GitHub blob URL with proper encoding and ?raw=true
             relative_path = f"{category}/{team}/{subdir}/{filename}"
             encoded_path = quote(relative_path, safe='/')
-            github_url = f"{GITHUB_BLOB_URL}/{encoded_path}?raw=true"
+            github_url = f"{GITHUB_BLOB_URL}/{encoded_path}"
             github_urls.append(github_url)
     
     return github_urls
