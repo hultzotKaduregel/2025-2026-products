@@ -1602,6 +1602,7 @@ def insert_product_in_order(csv_file: Path, product_row: Dict, product_info: Dic
                     new_name = f"{parts[0]} 1 {parts[1]}"
                 
                 rows[i]['name'] = new_name
+                update_product_in_merchant_feed(csv_file, existing_name, new_name)
                 print(f"✓ המוצר הקיים שונה ל: {new_name}")
                 break
 
@@ -1857,7 +1858,7 @@ def interactive_add_product(csv_file: Path, append_to_merchant: bool = False):
             print("בחר פאצ׳ים נוספים להוסיף (מעבר ל'ללא פאץ׳' ו'ליגה'):")
             
             patch_extra_options = [
-                "לא להוסיף פאצ׳ים נוספים (רק ליגת האלופות)",
+                "ליגת האלופות",
                 "הליגה האירופית",
                 "קונפרנס ליג",
                 "ליגת האלופות והליגה האירופית",
@@ -2320,6 +2321,46 @@ def append_single_product_to_merchant_feed(csv_file: Path, product_name: str, pr
         
         writer.writerow(product_data)
 
+def update_product_in_merchant_feed(csv_file: Path, old_product_name: str, new_product_name: str):
+    """Update a product name in the Google Merchant feed"""
+    output_file = csv_file.parent / f"{csv_file.stem}_googlemerchant.txt"
+    
+    if not output_file.exists():
+        return  # Nothing to update
+    
+    # Read all rows
+    rows = []
+    with open(output_file, 'r', encoding='utf-8', newline='') as f:
+        reader = csv.DictReader(f, delimiter='\t')
+        fieldnames = reader.fieldnames
+        rows = list(reader)
+    
+    # Find and update the matching product
+    updated = False
+    for row in rows:
+        # Generate the old product ID
+        old_product_id = generate_product_id(old_product_name)
+        
+        if row['id'] == old_product_id:
+            # Update with new name
+            new_title = re.sub(r'(\d{4})/(\d{4})', lambda m: f"{m.group(1)[-2:]}/{m.group(2)[-2:]}", new_product_name)
+            new_product_url_slug = sanitize_url_text(new_product_name)
+            new_product_link = f"https://www.xn--6dbbfabi4agf8g0au.com/product-page/{new_product_url_slug}"
+            new_product_id = generate_product_id(new_product_name)
+            
+            row['id'] = new_product_id
+            row['title'] = new_title
+            row['description'] = new_title
+            row['link'] = new_product_link
+            updated = True
+            break
+    
+    if updated:
+        # Write back all rows
+        with open(output_file, 'w', encoding='utf-8', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames, delimiter='\t', extrasaction='ignore', lineterminator='\n')
+            writer.writeheader()
+            writer.writerows(rows)
 
 def main():
     parser = argparse.ArgumentParser(
