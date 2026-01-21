@@ -100,6 +100,13 @@ NATIONAL_TEAMS = [
     "נבחרות אחרות"
 ]
 
+OTHER_NATIONALS = [
+    "אוסטרליה", "אוסטריה", "אורוגוואי", "אלגיריה", "ארה\"ב",
+    "טוניסיה", "יפן", "ירדן", "מקסיקו", "מצרים", "מרוקו",
+    "נורווגיה", "סקוטלנד", "ערב הסעודית", "קטאר", "קנדה", "שוויץ",
+    "נבחרות אחרות"
+]
+
 # Shirt type mapping
 SHIRT_TYPE_EN = {
     "בית": "first",
@@ -351,8 +358,13 @@ def create_product_row(product_info: Dict) -> Dict:
     
     else:
         # Regular categories
-        collection_parts = [category, product_info['team']]
-    
+        collection_parts = [category]
+        
+        team = product_info['team']
+        collection_parts.append(team)
+        if team in OTHER_NATIONALS:
+            collection_parts.append("נבחרות אחרות")
+
     collection = ";".join(collection_parts)
     
     # Determine default sizes based on category and age group
@@ -1424,6 +1436,43 @@ def check_product_exists(csv_file: Path, product_info: Dict) -> Optional[str]:
     return None
 
 
+# def get_sort_key(row: Dict, product_info: Dict) -> tuple:
+#     """Generate sort key for a product row"""
+#     if row['fieldType'] != 'Product':
+#         # This shouldn't happen, but handle it
+#         return (999, 999, 999, "")
+    
+#     # Extract info from the row
+#     name = row.get('name', '')
+#     collection = row.get('collection', '')
+    
+#     # Parse collection to get category and team
+#     parts = collection.split(';')
+#     row_category = parts[0] if len(parts) > 0 else ''
+#     row_team = parts[1] if len(parts) > 1 else ''
+    
+#     # Extract shirt type from name (including שוער 1 and שוער 2)
+#     row_shirt_type = None
+    
+#     # Check for שוער 1 or שוער 2 first
+#     if " שוער 1 " in name:
+#         row_shirt_type = "שוער 1"
+#     elif " שוער 2 " in name:
+#         row_shirt_type = "שוער 2"
+#     else:
+#         # Check for regular shirt types
+#         for st in SHIRT_TYPES:
+#             if f" {st} " in name:
+#                 row_shirt_type = st
+#                 break
+    
+#     # Build sort key
+#     category_rank = CATEGORY_ORDER.get(row_category, 999)
+#     team_rank = TEAM_ORDER.get(row_team, 999)
+#     shirt_type_rank = SHIRT_TYPE_ORDER.get(row_shirt_type, 0) if row_shirt_type else 0
+    
+#     return (category_rank, team_rank, shirt_type_rank, name)
+
 def get_sort_key(row: Dict, product_info: Dict) -> tuple:
     """Generate sort key for a product row"""
     if row['fieldType'] != 'Product':
@@ -1439,25 +1488,34 @@ def get_sort_key(row: Dict, product_info: Dict) -> tuple:
     row_category = parts[0] if len(parts) > 0 else ''
     row_team = parts[1] if len(parts) > 1 else ''
     
-    # Extract shirt type from name (including שוער 1 and שוער 2)
-    row_shirt_type = None
+    # Determine shirt_type_rank based on category
+    shirt_type_rank = 0
     
-    # Check for שוער 1 or שוער 2 first
-    if " שוער 1 " in name:
-        row_shirt_type = "שוער 1"
-    elif " שוער 2 " in name:
-        row_shirt_type = "שוער 2"
+    if row_category in ["אימוניות", "ג'קטים ומעילים"]:
+        # For jackets/tracksuits: no shirt type sorting, use 0 for all
+        # They will be sorted alphabetically by name (the 4th element in tuple)
+        shirt_type_rank = 0
     else:
-        # Check for regular shirt types
-        for st in SHIRT_TYPES:
-            if f" {st} " in name:
-                row_shirt_type = st
-                break
+        # For shirts: extract shirt type from name
+        row_shirt_type = None
+        
+        # Check for שוער 1 or שוער 2 first
+        if " שוער 1 " in name:
+            row_shirt_type = "שוער 1"
+        elif " שוער 2 " in name:
+            row_shirt_type = "שוער 2"
+        else:
+            # Check for regular shirt types
+            for st in SHIRT_TYPES:
+                if f" {st} " in name:
+                    row_shirt_type = st
+                    break
+        
+        shirt_type_rank = SHIRT_TYPE_ORDER.get(row_shirt_type, 0) if row_shirt_type else 0
     
     # Build sort key
     category_rank = CATEGORY_ORDER.get(row_category, 999)
     team_rank = TEAM_ORDER.get(row_team, 999)
-    shirt_type_rank = SHIRT_TYPE_ORDER.get(row_shirt_type, 0) if row_shirt_type else 0
     
     return (category_rank, team_rank, shirt_type_rank, name)
 
