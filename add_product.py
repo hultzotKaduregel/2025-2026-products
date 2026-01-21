@@ -437,7 +437,7 @@ def create_product_row(product_info: Dict) -> Dict:
             row[f'productOptionName{option_num}'] = 'הוסף גרביים'
         elif category == "ג'קטים ומעילים":
             # For jackets (adults only) - name is "הוסף מכנסיים"
-            row[f'productOptionName{option_num}'] = 'הוסף מכנס'
+            row[f'productOptionName{option_num}'] = 'הוסף מכנסיים'
         else:
             # For shirts - name is "השלם לסט"
             row[f'productOptionName{option_num}'] = 'השלם לסט'
@@ -1501,7 +1501,8 @@ def insert_product_in_order(csv_file: Path, product_row: Dict, product_info: Dic
         for i, row in enumerate(rows):
             if row['fieldType'] == 'Product' and row.get('name') == existing_name:
                 # Rename existing to שוער 1
-                new_name = row['name'].replace(' שוער ', ' שוער 1 ')
+                parts = row['name'].rsplit(' ', 1)
+                new_name = f"{parts[0]} 1 {parts[1]}"
                 rows[i]['name'] = new_name
                 print(f"✓ המוצר הקיים שונה ל: {new_name}")
                 break
@@ -1902,12 +1903,12 @@ def interactive_add_product(csv_file: Path, append_to_merchant: bool = False):
         print("="*70)
         
         # Special handling for goalkeeper (שוער) - allow adding as שוער 2
-        if shirt_type == "שוער":
+        if shirt_type == "שוער" or category in ["ג'קטים ומעילים", "אימוניות"]:
             if PICK_AVAILABLE:
                 # Use arrow-based selection
                 options = [
                     "החלף את המוצר הקיים",
-                    "הוסף כמוצר נוסף (המוצר הקיים יהפוך ל'שוער 1' והחדש ל'שוער 2')",
+                    "הוסף כמוצר נוסף (המוצר הקיים יהפוך ל'1' והחדש ל'2')",
                     "בטל"
                 ]
                 selected, index = pick(options, "\nמה תרצה לעשות?", indicator='=>')
@@ -1942,7 +1943,8 @@ def interactive_add_product(csv_file: Path, append_to_merchant: bool = False):
                 product_info['add_as_goalkeeper_2'] = True
                 product_info['existing_name'] = existing_product
                 # Update the new product name to include "2"
-                product_name = product_name.replace(" שוער ", " שוער 2 ")
+                parts = product_name.rsplit(' ', 1)
+                product_name = f"{parts[0]} 2 {parts[1]}"
                 product_info['name'] = product_name
                 print(f"   שם המוצר החדש: {product_name}")
         else:
