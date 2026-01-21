@@ -1397,8 +1397,9 @@ def check_product_exists(csv_file: Path, product_info: Dict) -> Optional[str]:
             # For חולצות גברים check both regular and גרסת אוהד versions
             if category == "חולצות גברים":
                 # Check for base pattern with team, sub-category, and season
-                base_pattern = f"{team} {sub_category} {season_short}"
-                if base_pattern in product_name and season_short in product_name:
+                # Also match numbered versions (e.g., "שוער", "שוער 1", "שוער 2")
+                pattern = re.escape(f"{team} {sub_category}") + r'( \d+| [א-ת]+)? ' + re.escape(season_short)
+                if re.search(pattern, product_name):
                     return product_name
             
             # For other categories, check exact pattern
@@ -1424,54 +1425,86 @@ def check_product_exists(csv_file: Path, product_info: Dict) -> Optional[str]:
                     return product_name
             
             elif category == "אימוניות":
-                pattern = f"אימונית {team} {sub_category} {season_short}"
-                if pattern in product_name:
+                # Match color with optional number or text after it
+                color_pattern = re.escape(sub_category) + r'( \d+| [א-ת]+)?'
+                base_pattern = f"אימונית {team}"
+                
+                if base_pattern in product_name and re.search(color_pattern, product_name) and season_short in product_name:
                     return product_name
             
             elif category == "ג'קטים ומעילים":
-                # Check if team, color, and season are in the product name
-                if team in product_name and sub_category in product_name and season_short in product_name:
-                    return product_name
+                # Check if team, color (with optional number), and season are in the product name
+                jacket_type = product_info.get('jacket_type', '')
+                age_group = product_info.get('age_group', 'מבוגרים')
+                
+                # Build pattern to match color with optional number or text after it
+                color_pattern = re.escape(sub_category) + r'( \d+| [א-ת]+)?'
+                
+                if team in product_name and re.search(color_pattern, product_name) and season_short in product_name:
+                    if jacket_type in product_name and (age_group == "מבוגרים" or "ילדים" in product_name):
+                        return product_name
     
     return None
 
+def find_next_available_number(csv_file: Path, product_info: Dict, base_name: str) -> int:
+    """Find the next available number suffix for a product"""
+    if not csv_file.exists():
+        return 1
+    
+    season_short = f"{product_info['season'].split('/')[1]}/{product_info['season'].split('/')[0]}"
+    category = product_info['category']
+    team = product_info['team']
+    
+    # Pattern to match numbered versions
+    # e.g., "חולצת ברצלונה שוער 1 26/25", "חולצת ברצלונה שוער 2 26/25"
+    existing_numbers = []
+    
+    with open(csv_file, 'r', encoding='utf-8-sig', newline='') as f:
+        reader = csv.DictReader(f)
+        
+        for row in reader:
+            if row['fieldType'] != 'Product':
+                continue
+            
+            product_name = row.get('name', '')
+            
+            # Check if this product matches our base pattern
+            # Extract base name without number (everything before the last space and year)
+            parts = product_name.rsplit(' ', 1)
+            if len(parts) == 2:
+                name_without_year = parts[0]
+                year_part = parts[1]
+                
+                # Check if year matches
+                if year_part == season_short:
+                    # Try to extract number from the end of name_without_year
+                    # Pattern: base_name followed by optional space and digit
+                    match = re.search(r'^(.+?)\s+(\d+)$', name_without_year)
+                    if match:
+                        name_base = match.group(1)
+                        number = int(match.group(2))
+                        
+                        # Check if this matches our base (without number)
+                        if base_name.strip() == name_base.strip():
+                            existing_numbers.append(number)
+                    else:
+                        # No number suffix - this is the original (treat as 0)
+                        if name_without_year.strip() == base_name.strip():
+                            existing_numbers.append(0)
+    
+    # Find next available number
+    if not existing_numbers:
+        return 1
+    
+    # Find the first gap or return max + 1
+    existing_numbers.sort()
+    for i in range(1, max(existing_numbers) + 2):
+        if i not in existing_numbers:
+            return i
+    
+    return 1
 
-# def get_sort_key(row: Dict, product_info: Dict) -> tuple:
-#     """Generate sort key for a product row"""
-#     if row['fieldType'] != 'Product':
-#         # This shouldn't happen, but handle it
-#         return (999, 999, 999, "")
-    
-#     # Extract info from the row
-#     name = row.get('name', '')
-#     collection = row.get('collection', '')
-    
-#     # Parse collection to get category and team
-#     parts = collection.split(';')
-#     row_category = parts[0] if len(parts) > 0 else ''
-#     row_team = parts[1] if len(parts) > 1 else ''
-    
-#     # Extract shirt type from name (including שוער 1 and שוער 2)
-#     row_shirt_type = None
-    
-#     # Check for שוער 1 or שוער 2 first
-#     if " שוער 1 " in name:
-#         row_shirt_type = "שוער 1"
-#     elif " שוער 2 " in name:
-#         row_shirt_type = "שוער 2"
-#     else:
-#         # Check for regular shirt types
-#         for st in SHIRT_TYPES:
-#             if f" {st} " in name:
-#                 row_shirt_type = st
-#                 break
-    
-#     # Build sort key
-#     category_rank = CATEGORY_ORDER.get(row_category, 999)
-#     team_rank = TEAM_ORDER.get(row_team, 999)
-#     shirt_type_rank = SHIRT_TYPE_ORDER.get(row_shirt_type, 0) if row_shirt_type else 0
-    
-#     return (category_rank, team_rank, shirt_type_rank, name)
+
 
 def get_sort_key(row: Dict, product_info: Dict) -> tuple:
     """Generate sort key for a product row"""
@@ -1555,16 +1588,23 @@ def insert_product_in_order(csv_file: Path, product_row: Dict, product_info: Dic
     if product_info.get('add_as_goalkeeper_2'):
         existing_name = product_info.get('existing_name')
         
-        # Find and rename the existing goalkeeper to "שוער 1"
+        # Find and rename the existing product
         for i, row in enumerate(rows):
             if row['fieldType'] == 'Product' and row.get('name') == existing_name:
-                # Rename existing to שוער 1
-                parts = row['name'].rsplit(' ', 1)
-                new_name = f"{parts[0]} 1 {parts[1]}"
+                # Check if custom suffix is provided
+                if 'custom_suffix_existing' in product_info:
+                    # Custom naming
+                    parts = row['name'].rsplit(' ', 1)
+                    new_name = f"{parts[0]} {product_info['custom_suffix_existing']} {parts[1]}"
+                else:
+                    # Default numbered naming
+                    parts = row['name'].rsplit(' ', 1)
+                    new_name = f"{parts[0]} 1 {parts[1]}"
+                
                 rows[i]['name'] = new_name
                 print(f"✓ המוצר הקיים שונה ל: {new_name}")
                 break
-        
+
         # Now insert the new goalkeeper 2 product in the correct position
         # (it should come right after goalkeeper 1)
         new_key = get_product_sort_key(product_info)
@@ -1961,12 +2001,14 @@ def interactive_add_product(csv_file: Path, append_to_merchant: bool = False):
         print("="*70)
         
         # Special handling for goalkeeper (שוער) - allow adding as שוער 2
+        # Special handling for goalkeeper, jackets, and tracksuits - allow adding numbered versions
         if shirt_type == "שוער" or category in ["ג'קטים ומעילים", "אימוניות"]:
             if PICK_AVAILABLE:
                 # Use arrow-based selection
                 options = [
                     "החלף את המוצר הקיים",
                     "הוסף כמוצר נוסף (המוצר הקיים יהפוך ל'1' והחדש ל'2')",
+                    "הוסף כמוצר נוסף עם שמות מותאמים אישית",
                     "בטל"
                 ]
                 selected, index = pick(options, "\nמה תרצה לעשות?", indicator='=>')
@@ -1975,19 +2017,20 @@ def interactive_add_product(csv_file: Path, append_to_merchant: bool = False):
                 # Fallback to number-based selection
                 print("\nאפשרויות:")
                 print("  1. החלף את המוצר הקיים")
-                print("  2. הוסף כמוצר נוסף (המוצר הקיים יהפוך ל'שוער 1' והחדש ל'שוער 2')")
-                print("  3. בטל")
+                print("  2. הוסף כמוצר נוסף (המוצר הקיים יהפוך ל'1' והחדש ל'2')")
+                print("  3. הוסף כמוצר נוסף עם שמות מותאמים אישית")
+                print("  4. בטל")
                 
                 while True:
                     try:
-                        choice = int(input("\nבחר אפשרות (1/2/3): "))
-                        if choice in [1, 2, 3]:
+                        choice = int(input("\nבחר אפשרות (1/2/3/4): "))
+                        if choice in [1, 2, 3, 4]:
                             break
-                        print("❌ נא לבחור 1, 2 או 3")
+                        print("❌ נא לבחור 1, 2, 3 או 4")
                     except ValueError:
                         print("❌ נא להזין מספר תקין")
             
-            if choice == 3:
+            if choice == 4:
                 print("\n❌ פעולת ההוספה בוטלה.")
                 return
             elif choice == 1:
@@ -1995,16 +2038,52 @@ def interactive_add_product(csv_file: Path, append_to_merchant: bool = False):
                 print("\n✓ המוצר הקיים יוחלף במוצר החדש")
                 product_info['replace_existing'] = True
                 product_info['existing_name'] = existing_product
-            else:  # choice == 2
-                # Add as שוער 2
-                print("\n✓ המוצר הקיים יהפוך ל'שוער 1' והמוצר החדש יתוסף כ'שוער 2'")
+            elif choice == 2:
+                # Find next available number
+                parts = product_name.rsplit(' ', 1)
+                base_name = parts[0]
+                next_number = find_next_available_number(csv_file, product_info, base_name)
+                
+                print(f"\n✓ המוצר החדש יתוסף כמספר {next_number}")
                 product_info['add_as_goalkeeper_2'] = True
                 product_info['existing_name'] = existing_product
-                # Update the new product name to include "2"
-                parts = product_name.rsplit(' ', 1)
-                product_name = f"{parts[0]} 2 {parts[1]}"
+                product_info['next_number'] = next_number
+                
+                # Update the new product name with next available number
+                product_name = f"{parts[0]} {next_number} {parts[1]}"
                 product_info['name'] = product_name
                 print(f"   שם המוצר החדש: {product_name}")
+            else:  # choice == 3
+                # Custom naming
+                print("\n✓ מצב התאמה אישית של שמות")
+                print(f"   המוצר הקיים: {existing_product}")
+                
+                # Ask for custom suffix for existing product
+                existing_suffix = input("\nהזן תוספת לשם המוצר הקיים (לדוגמה: 'אדום', 'כחול', 'ראשון'): ").strip()
+                if not existing_suffix:
+                    print("❌ לא הוזנה תוספת, פעולה בוטלה")
+                    return
+                
+                # Ask for custom suffix for new product
+                new_suffix = input("הזן תוספת לשם המוצר החדש (לדוגמה: 'שחור', 'לבן', 'שני'): ").strip()
+                if not new_suffix:
+                    print("❌ לא הוזנה תוספת, פעולה בוטלה")
+                    return
+                
+                # Update product info with custom suffixes
+                product_info['add_as_goalkeeper_2'] = True
+                product_info['existing_name'] = existing_product
+                product_info['custom_suffix_existing'] = existing_suffix
+                product_info['custom_suffix_new'] = new_suffix
+                
+                # Update the new product name with custom suffix
+                parts = product_name.rsplit(' ', 1)
+                product_name = f"{parts[0]} {new_suffix} {parts[1]}"
+                product_info['name'] = product_name
+                
+                print(f"\n   המוצר הקיים ישונה ל: {parts[0]} {existing_suffix} {parts[1]}")
+                print(f"   שם המוצר החדש: {product_name}")
+            
         else:
             # Regular product - ask if user wants to modify
             if PICK_AVAILABLE:
