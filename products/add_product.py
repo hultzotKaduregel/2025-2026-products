@@ -107,14 +107,6 @@ OTHER_NATIONALS = [
     "נבחרות אחרות"
 ]
 
-# Shirt type mapping
-SHIRT_TYPE_EN = {
-    "בית": "first",
-    "חוץ": "second",
-    "השלישית": "third",
-    "שוער": "goalkeeper"
-}
-
 # Size options
 SIZE_OPTIONS_SMALL = "S;M;L;XL;2XL"
 SIZE_OPTIONS_LARGE = "S;M;L;XL;2XL;3XL;4XL"
@@ -2117,7 +2109,7 @@ def interactive_add_product(csv_file: Path, append_to_merchant: bool = False):
     if category in ["אימוניות", "ג'קטים ומעילים"]:
         subdir = color  # Use color as-is for these categories
     else:
-        subdir = SHIRT_TYPE_EN.get(shirt_type, "main")  # Convert Hebrew shirt type to English
+        subdir = shirt_type
     
     github_urls = download_images(image_urls, category, team, subdir)
     

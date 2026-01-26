@@ -1,0 +1,22 @@
+{
+  "patch": {
+    "ליגת האלופות": "Champions League",
+    "ללא פאץ'": "",
+    "ללא פאץ׳": "",
+    "ליגה": "League",
+    "Qatar 2022+FIFA": "Qatar 2022+FIFA"
+  },
+  "team_leagues": {
+    "ריאל מדריד": "LFP",
+    "ברצלונה": "LFP",
+    "פריז סן ז'רמן": "Ligue 1",
+    "מנצ'סטר יונייטד": "Premier league",
+    "ליברפול": "Premier league",
+    "אינטר מילאנו": "Serie A",
+    "באיירן מינכן": "Bundesliga"
+  },
+  "address_translations": {
+    "נתנאל  גוטמן": "\u001b[A",
+    "דרורית  31": "\u001b[A\u001b[A"
+  }
+}
