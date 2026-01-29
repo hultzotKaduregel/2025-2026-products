@@ -20,6 +20,7 @@ from docx.oxml.ns import qn
 from docx.shared import RGBColor
 import glob
 import os
+from datetime import datetime
 
 
 # Global variable for product images base path
@@ -1193,7 +1194,8 @@ def main():
     print(f"Total items: {total_items}")
     
     # Create Word document
-    output_file = 'orders_table.docx'
+    current_date = datetime.now().strftime('%Y-%m-%d')
+    output_file = f'orders_{current_date}.docx'
     created_file = create_word_table(orders, output_file)
     print(f"\nWord document created: {created_file}")
     
