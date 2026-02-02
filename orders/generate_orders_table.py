@@ -27,118 +27,86 @@ from datetime import datetime
 PRODUCTS_IMAGES_BASE = '../products/images'
 
 
-def get_category_directory(category):
+def find_product_path_dynamic(product_name, base_path):
     """
-    Map category name to its directory name.
+    Dynamically match product name to directory structure by walking filesystem.
     
     Args:
-        category: Category extracted from product name
+        product_name: Full product name
+        base_path: Starting directory path (e.g., ../products/images or ../products/images/2025-2026)
     
     Returns:
-        Directory name for the category
+        Full directory path if found, None otherwise
     """
-    category_mapping = {
-        'אימונית': 'אימוניות',
-        "ג'קט": "ג'קטים ומעילים",
-        'מעיל רוח': "ג'קטים ומעילים",
-        'חולצת': 'חולצות גברים',
-        'חולצה ארוכה': 'חולצות גברים ארוכות',
-        'חולצת נשים': 'חולצות נשים',
-        'חליפת ילדים': 'חליפות ילדים',
-        'מכנס': 'מכנסיים'
+    # Reverse mapping: directory name -> possible prefixes
+    dir_to_prefix = {
+        'אימוניות': ['אימונית'],
+        "ג'קטים ומעילים": ["ג'קט", 'מעיל רוח'],
+        'חולצות גברים': ['חולצת'],
+        'חולצות גברים ארוכות': ['חולצה ארוכה'],
+        'חולצות נשים': ['חולצת נשים'],
+        'חליפות ילדים': ['חליפת ילדים'],
+        'מכנסיים': ['מכנס']
     }
     
-    return category_mapping.get(category, category)
-
-
-def extract_product_segments(product_name):
-    """
-    Extract category, team, type, and season from product name.
-    
-    Returns:
-        tuple: (category, team, type, season) or (None, None, None, None) if parsing fails
-    """
-    if not product_name:
-        return None, None, None, None
-    
-    # Define category patterns (order matters - check longer patterns first)
-    categories = [
-        'חולצת נשים',      # Women's shirt (check first - longer pattern)
-        'חולצה ארוכה',      # Long sleeve shirt
-        'חליפת ילדים',     # Kids kit
-        'מעיל רוח',        # Windbreaker
-        'חולצת',           # Shirt
-        'מכנס',            # Shorts/Pants
-        'אימונית',         # Training suit
-        "ג'קט",           # Jacket
-    ]
-    
-    # Find matching category
-    category = None
     remaining = product_name
+    current_path = base_path
     
-    for cat in categories:
-        if product_name.startswith(cat):
-            category = cat
-            # Remove category from the beginning
-            remaining = product_name[len(cat):].strip()
-            break
+    if not os.path.exists(current_path):
+        return None
     
-    if not category:
-        return None, None, None, None
-    
-    # Now extract team and type
-    # Pattern: [team name] [type] [season]
-    # Type patterns: בית, חוץ, השלישי, השלישית
-    type_patterns = ['בית', 'חוץ', 'השלישי', 'השלישית']
-    
-    # Find the type keyword
-    type_found = None
-    type_index = -1
-    
-    for type_pattern in type_patterns:
-        # Look for type pattern followed by space and year pattern
-        pattern_with_space = f' {type_pattern} '
-        idx = remaining.find(pattern_with_space)
-        if idx != -1:
-            type_found = type_pattern
-            type_index = idx
-            break
-    
-    if type_index == -1:
-        # Try to find type at the end (before season)
-        for type_pattern in type_patterns:
-            if type_pattern in remaining:
-                idx = remaining.find(f' {type_pattern}')
-                if idx != -1:
-                    type_found = type_pattern
-                    type_index = idx
+    # Walk through directory levels
+    while remaining and os.path.exists(current_path):
+        # List directories at current level
+        try:
+            dirs = [d for d in os.listdir(current_path) 
+                    if os.path.isdir(os.path.join(current_path, d))]
+        except:
+            return None
+        
+        if not dirs:
+            # No more subdirectories, this might be our final path
+            return current_path
+        
+        # Sort by directory name length (longest first) to match longest prefix
+        dirs.sort(reverse=True)
+        
+        matched = False
+        for dir_name in dirs:
+            # Check if this directory name matches based on prefix mapping
+            prefixes = dir_to_prefix.get(dir_name, [dir_name])  # Default to dir_name itself
+            
+            for prefix in prefixes:
+                if remaining.startswith(prefix):
+                    # Match found - move to this directory
+                    current_path = os.path.join(current_path, dir_name)
+                    remaining = remaining[len(prefix):].strip()
+                    matched = True
                     break
+            
+            if matched:
+                break
+        
+        if not matched:
+            # Try direct match (for team names, types like בית/חוץ)
+            for dir_name in dirs:
+                if remaining.startswith(dir_name):
+                    current_path = os.path.join(current_path, dir_name)
+                    remaining = remaining[len(dir_name):].strip()
+                    matched = True
+                    break
+        
+        if not matched:
+            # No match at this level
+            return current_path if os.path.exists(current_path) else None
     
-    if type_index == -1:
-        return None, None, None, None
-    
-    # Team is everything before the type
-    team = remaining[:type_index].strip()
-    
-    # Type is the keyword we found
-    type_segment = type_found
-    
-    # Extract season from the end
-    # Look for pattern like "2025/2026" or "2024/2025"
-    season_match = re.search(r'(\d{4})/(\d{4})', remaining)
-    season = None
-    if season_match:
-        year1 = season_match.group(1)
-        year2 = season_match.group(2)
-        season = f"{year1}-{year2}"
-    
-    return category, team, type_segment, season
+    return current_path
 
 
 def find_product_image(product_name, translations):
     """
     Find the first image (alphabetically) for a product based on its name.
+    Uses dynamic filesystem matching.
     
     Args:
         product_name: Full product name
@@ -147,36 +115,35 @@ def find_product_image(product_name, translations):
     Returns:
         Path to image file or None if not found
     """
-    category, team, type_segment, season = extract_product_segments(product_name)
-    
-    if not category or not team or not type_segment:
+    if not product_name:
         return None
     
-    # Get the directory name for the category
-    category_dir = get_category_directory(category)
+    # Extract season from product name
+    season_match = re.search(r'(\d{4})/(\d{4})', product_name)
+    season = None
+    if season_match:
+        year1 = season_match.group(1)
+        year2 = season_match.group(2)
+        season = f"{year1}-{year2}"
     
-    # Construct path using Hebrew names directly
-    # If season exists, prepend it to the path: ../products/images/2025-2026/[category]/[team]/[type]
-    # Otherwise: ../products/images/[category]/[team]/[type]
+    # Determine base path
     if season:
-        image_dir = os.path.join(PRODUCTS_IMAGES_BASE, season, category_dir, team, type_segment)
+        base_path = os.path.join(PRODUCTS_IMAGES_BASE, season)
     else:
-        image_dir = os.path.join(PRODUCTS_IMAGES_BASE, category_dir, team, type_segment)
+        base_path = PRODUCTS_IMAGES_BASE
     
-    # Normalize the path to handle escaped spaces and other issues
-    image_dir = os.path.normpath(image_dir)
+    # Find the matching directory path dynamically
+    image_dir = find_product_path_dynamic(product_name, base_path)
     
-    # Check if directory exists
-    if not os.path.exists(image_dir):
-        print(f"Warning: Image directory not found: {image_dir}")
+    if not image_dir or not os.path.exists(image_dir):
+        print(f"Warning: Image directory not found for product: {product_name}")
         return None
     
-    # Find all images in directory (jpg, jpeg, png, gif, webp)
+    # Find all images in directory
     image_extensions = ['*.jpg', '*.jpeg', '*.png', '*.gif', '*.webp', '*.JPG', '*.JPEG', '*.PNG']
     
     all_images = []
     for ext in image_extensions:
-        # Use os.path.join which handles spaces properly
         pattern = os.path.join(image_dir, ext)
         images = glob.glob(pattern)
         all_images.extend(images)
@@ -482,7 +449,7 @@ def extract_team_name(product_name):
         return None
     
     # Define the prefix and suffix patterns
-    prefix_pattern = r'(?:חולצת|חולצה ארוכה|חולצת נשים|חליפת ילדים|מכנס)\s+'
+    prefix_pattern = r'(?:|חולצת נשים|חולצה ארוכה|חולצת|חליפת ילדים|מכנס)\s+'
     suffix_pattern = r'\s+(?:בית|חוץ|השלישי|השלישית)'
     
     # Create full pattern to extract team name
@@ -785,11 +752,13 @@ Shipping label: {shipping_label}
 
 Requirements:
 1. Translate any Hebrew text to English
-2. If the zip code is missing (empty field between City and Country), look it up based on the street and city in Israel
-3. Keep the exact format with "Name:", "Address:", "City:", "Zip Code:", "Phone:" labels
-4. Each field on a new line
-5. If a field is completely missing from the input, write "N/A" for that field
-6. Remove any quotes from phone numbers
+2. For street and city names, first, use the official English transliteration from Google Maps. If not available, use the Hebrew transliteration (not translation).
+    - Example for transliteration (NOT translation): רחוב ששת הימים → "Sheshet HaYamim St." (NOT "Six Days St.")
+3. If the zip code is missing (empty field between City and Country), look it up based on the street and city in Israel
+4. Keep the exact format with "Name:", "Address:", "City:", "Zip Code:", "Phone:" labels
+5. Each field on a new line
+6. If a field is completely missing from the input, write "N/A" for that field
+7. Remove any quotes from phone numbers
 
 Please provide ONLY the formatted address, nothing else."""
 
