@@ -63,7 +63,7 @@ def save_memory(memory: Dict):
 GITHUB_BLOB_URL = "https://raw.github.com/hultzotKaduregel/2025-2026-products/refs/heads/main/images"
 
 # Season options
-SEASONS = ["2026/2025", "2027/2026", "2028/2027", "2029/2028", "2030/2029"]
+SEASONS = ["2025/2026", "2026/2027", "2027/2028", "2028/2029", "2029/2030"]
 
 # Categories
 CATEGORIES = [
@@ -79,7 +79,7 @@ CATEGORIES = [
 # Sub-categories
 VERSION_OPTIONS = ["גרסת אוהד", "גרסת שחקן"]
 JACKET_OPTIONS = ["ג'קט", "מעיל רוח"]
-SHIRT_TYPES = ["בית", "חוץ", "השלישית", "שוער"]
+SHIRT_TYPES = ["בית", "חוץ", "השלישית", "הרביעית", "שוער"]
 
 # Teams
 CLUB_TEAMS = [
@@ -271,14 +271,20 @@ def download_images(urls: List[str], category: str, team: str, subdir: str) -> L
 
 def build_product_name(category: str, team: str, shirt_type: Optional[str], 
                        version: Optional[str], jacket_type: Optional[str], 
-                       color: Optional[str], season: str, age_group: Optional[str] = None) -> str:
+                       color: Optional[str], season: str, age_group: Optional[str] = None,
+                       player_name: Optional[str] = None, player_number: Optional[str] = None) -> str:
     """Build product name based on selections"""
     
-    season_short = f"{season.split('/')[1]}/{season.split('/')[0]}"
+    season_short = season
     
     # חולצות גברים
     if category == "חולצות גברים":
         base_name = f"חולצת {team} {shirt_type} {season_short}"
+        
+        # Check if player-specific
+        if player_name and player_number:
+            return f"{base_name} ({player_name} #{player_number})"
+        
         if version == "גרסת שחקן":
             return f"{base_name} - גרסת שחקן"
         return base_name
@@ -322,7 +328,7 @@ def create_product_row(product_info: Dict) -> Dict:
     season_full = product_info['season']  # e.g., "2025/2026"
     year1 = season_full.split('/')[0][-2:]  # "25"
     year2 = season_full.split('/')[1][-2:]  # "26"
-    season_yy = f"{year2}/{year1}"  # "26/25"
+    season_yy = f"{year1}/{year2}" # "25/26"
     description_name = product_name.replace(f"{season_full.split('/')[1]}/{season_full.split('/')[0]}", season_yy)
     description = f"<p>{description_name}</p>"
     category = product_info['category']
@@ -1350,9 +1356,10 @@ SHIRT_TYPE_ORDER = {
     "בית": 1,
     "חוץ": 2,
     "השלישית": 3,
-    "שוער": 4,
-    "שוער 1": 4,
-    "שוער 2": 5
+    "הרביעית": 4,
+    "שוער": 5,
+    "שוער 1": 5,
+    "שוער 2": 6
 }
 
 
@@ -1365,7 +1372,7 @@ def check_product_exists(csv_file: Path, product_info: Dict) -> Optional[str]:
         return None
     
     # Build the expected product name pattern
-    season_short = f"{product_info['season'].split('/')[1]}/{product_info['season'].split('/')[0]}"
+    season_short = product_info['season']
     category = product_info['category']
     team = product_info['team']
     
@@ -1736,6 +1743,32 @@ def interactive_add_product(csv_file: Path, append_to_merchant: bool = False):
         version = select_option("בחר גרסה:", VERSION_OPTIONS, default_version_idx)
         product_info['version'] = version
         memory['version'] = version
+
+        # Ask if general or player-specific
+        player_specific_options = ["כללית", "שחקן ספציפי"]
+        default_player_idx = 0
+        if 'player_specific' in memory and memory['player_specific'] in player_specific_options:
+            default_player_idx = player_specific_options.index(memory['player_specific'])
+
+        player_specific = select_option("בחר סוג חולצה:", player_specific_options, default_player_idx)
+        product_info['player_specific'] = player_specific
+        memory['player_specific'] = player_specific
+
+        # If player-specific, ask for player name and number
+        if player_specific == "שחקן ספציפי":
+            player_name = input("\nהזן שם שחקן באנגלית: ").strip()
+            if not player_name:
+                print("❌ לא הוזן שם שחקן, אנא הרץ שוב")
+                return
+            
+            product_info['player_name'] = player_name.upper()
+            
+            player_number = input("הזן מספר שחקן: ").strip()
+            if not player_number:
+                print("❌ לא הוזן מספר שחקן, אנא הרץ שוב")
+                return
+            
+            product_info['player_number'] = player_number
     
     elif category == "אימוניות":
         # Ask for size range (which determines age groups in collection)
@@ -1979,7 +2012,7 @@ def interactive_add_product(csv_file: Path, append_to_merchant: bool = False):
     # Build product name
 # Use custom team name if it exists, otherwise use team
     team_for_name = product_info.get('custom_team_name', team)
-    product_name = build_product_name(category, team_for_name, shirt_type, version, jacket_type, color, season, age_group)
+    product_name = build_product_name(category, team_for_name, shirt_type, version, jacket_type, color, season, age_group, product_info.get('player_name'), product_info.get('player_number'))
     product_info['name'] = product_name
     print(f"\n✓ שם המוצר: {product_name}")
     
@@ -2462,9 +2495,10 @@ python add_product.py -h
 """
     )
     
-    parser.add_argument('csv_file', type=str, help='נתיב לקובץ CSV (ייווצר אם לא קיים)')
+    parser.add_argument('csv_file', nargs='?', default='catalog_products.csv', type=str, 
+                   help='CSV file path (Default: catalog_products.csv)')
     parser.add_argument('--google-merchant', '-g', action='store_true', 
-                       help='יצירת קובץ Google Merchant נוסף בסיום')
+                       help='Create Google Merchant file upon completion')
     
     args = parser.parse_args()
     csv_path = Path(args.csv_file)

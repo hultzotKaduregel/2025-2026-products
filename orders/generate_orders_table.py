@@ -450,7 +450,7 @@ def extract_team_name(product_name):
     
     # Define the prefix and suffix patterns
     prefix_pattern = r'(?:|חולצת נשים|חולצה ארוכה|חולצת|חליפת ילדים|מכנס)\s+'
-    suffix_pattern = r'\s+(?:בית|חוץ|השלישי|השלישית)'
+    suffix_pattern = r'\s+(?:בית|חוץ|השלישי|השלישית|הרביעית)'
     
     # Create full pattern to extract team name
     pattern = prefix_pattern + r'(.+?)' + suffix_pattern
@@ -600,8 +600,15 @@ def extract_adds(options_text):
     return ""
 
 
-def extract_name(notes_text):
-    """Extract name from notes (שם מאחור field)."""
+def extract_name(notes_text, product_name=""):
+    """Extract name from notes (שם מאחור field) or product name for player-specific shirts."""
+    # First check if product name contains player info (format: "product name (PLAYER #NUMBER)")
+    if product_name:
+        player_match = re.search(r'\(([A-Z\s]+)\s*#(\d+)\)', product_name)
+        if player_match:
+            return player_match.group(1).strip()
+    
+    # Fall back to notes field
     if not notes_text:
         return ""
     
@@ -615,8 +622,15 @@ def extract_name(notes_text):
     return name
 
 
-def extract_number(notes_text):
-    """Extract number from notes (מספר מאחור field)."""
+def extract_number(notes_text, product_name=""):
+    """Extract number from notes (מספר מאחור field) or product name for player-specific shirts."""
+    # First check if product name contains player info (format: "product name (PLAYER #NUMBER)")
+    if product_name:
+        player_match = re.search(r'\(([A-Z\s]+)\s*#(\d+)\)', product_name)
+        if player_match:
+            return player_match.group(2).strip()
+    
+    # Fall back to notes field
     if not notes_text:
         return ""
     
@@ -962,8 +976,8 @@ def process_order(row, translations):
     size = extract_size(options)
     patch = extract_patch(options, product, translations)  # Pass product name for team extraction
     adds = extract_adds(options)
-    name = extract_name(notes)
-    number = extract_number(notes)
+    name = extract_name(notes, product)
+    number = extract_number(notes, product)
     address_info = extract_address(row, order_no, translations)  # Pass translations for caching
     
     # Find product image
